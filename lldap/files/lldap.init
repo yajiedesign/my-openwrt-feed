@@ -1,0 +1,87 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+USE_PROCD=1
+PROG=/usr/bin/lldap
+USER=lldap
+GROUP=lldap
+CONF=lldap
+
+append_env() {
+	procd_append_param env "LLDAP_$(echo "$1" | tr "a-z" "A-Z")"="$2"
+}
+
+config_cb() {
+	local type="$1"
+	local sect_name="$2"
+	if [ "$type" = "env" ]; then
+		option_cb() {
+			local option="$1"
+			local value="$2"
+			append_env "$option" "$value"
+		}
+	else
+		option_cb() {
+			return
+		}
+	fi
+}
+
+list_append_env() {
+	procd_append_param env "$1"
+}
+
+list_append_ro_mount() {
+	procd_add_jail_mount "$1"
+}
+
+init_workdir() {
+	local dir="$1"
+
+	mkdir -p "$dir"
+	chown "$USER:$GROUP" -R "$dir"
+	[ -f "/etc/lldap/lldap_config.toml" ] && chown "$USER:$GROUP" "/etc/lldap/lldap_config.toml"
+	[ -e "/usr/share/lldap/app" ] && [ ! -e "$dir/app" ] && ln -s /usr/share/lldap/app "$dir/app"
+}
+
+start_service() {
+	procd_open_instance
+
+	local _workdir
+	config_load "$CONF"
+	config_get _workdir daemon workdir '/tmp/lldap'
+
+	init_workdir "$_workdir"
+
+	procd_add_jail lldap log
+	procd_add_jail_mount /etc/TZ
+	procd_add_jail_mount /etc/ssl/certs/ca-certificates.crt
+	procd_add_jail_mount /bin/sh
+	procd_add_jail_mount /usr/bin/lldap
+	procd_add_jail_mount_rw "$_workdir"
+	[ -e "/usr/share/lldap/app" ] && procd_add_jail_mount /usr/share/lldap
+
+	config_list_foreach daemon ro_mount list_append_ro_mount
+	config_list_foreach daemon env list_append_env
+
+	procd_set_param command /usr/libexec/lldap "$_workdir" run
+	if [ -f "/etc/lldap/lldap_config.toml" ]; then
+		procd_append_param command --config-file /etc/lldap/lldap_config.toml
+		procd_add_jail_mount /etc/lldap/lldap_config.toml
+	fi
+
+	procd_set_param user "$USER"
+	procd_set_param group "$GROUP"
+	procd_set_param respawn
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_set_param capabilities "/etc/capabilities/lldap.json"
+	procd_set_param file "/etc/config/$CONF"
+	procd_close_instance
+}
+
+service_triggers() {
+	# NOTE: seems it does not have reload signal
+	procd_add_raw_trigger acme.renew 5000 /etc/init.d/lldap restart
+}
