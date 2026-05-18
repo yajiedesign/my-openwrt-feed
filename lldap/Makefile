@@ -9,7 +9,7 @@ PKG_SOURCE_URL:=https://github.com/lldap/lldap.git
 PKG_MIRROR_HASH:=6d2d5d96a1b6112cc75b26eea888445fc9bc5c315f0d6e2c06b1928cc3605bf0
 PKG_SOURCE_VERSION:=v${PKG_VERSION}
 
-PKG_MAINTAINER:=Vladimir Ermakov <vooon341@gmail.com>
+PKG_MAINTAINER:=Yajiedesign <yajiedesign@gmail.com>
 PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=LICENSE
 
